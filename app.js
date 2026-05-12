@@ -72,10 +72,8 @@ function initMap() {
 function notify(msg, type = 'info', duration = 3000) {
     const el = document.createElement('div');
     el.className = `notification ${type}`;
-    el.innerHTML = `<span>${msg}</span>`;
-    
-    ui.notifContainer.appendChild(el);
-    
+    // Omitting text entirely for minimalist dot indicator
+    document.getElementById('notification-container').appendChild(el);
     setTimeout(() => {
         el.classList.add('fade-out');
         setTimeout(() => el.remove(), 400);
