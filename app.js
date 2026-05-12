@@ -336,10 +336,10 @@ function drawDestination(dest, routeGeometry, walkTime, distMeters) {
     // Create custom marker with e-bike count
     const destIcon = L.divIcon({
         html: `
-            <div style="background:#ef4444;color:white;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;border:3px solid white;box-shadow:0 0 15px rgba(239,68,68,0.6);">
+            <div style="background:#32CD32;color:white;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;border:3px solid white;box-shadow:0 0 15px rgba(50,205,50,0.6);">
                 ${eBikes}
             </div>
-            <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:10px solid #ef4444;margin:-2px auto 0;"></div>
+            <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:10px solid #32CD32;margin:-2px auto 0;"></div>
         `,
         className: '',
         iconSize: [36, 46],
@@ -347,13 +347,13 @@ function drawDestination(dest, routeGeometry, walkTime, distMeters) {
     });
     
     state.destMarker = L.marker(state.destPos, { icon: destIcon }).addTo(state.map);
-    state.destMarker.bindPopup(`<b>${s.name || 'Bicing Station'}</b><br>${eBikes} E-Bikes available`).openPopup();
+    state.destMarker.bindPopup(`<b>${s.name || 'Bicing Station'}</b><br>${eBikes} E-Bikes available`, { autoPan: false }).openPopup();
     
     // Draw real street routing geometry (GeoJSON)
     const coords = routeGeometry.coordinates.map(c => [c[1], c[0]]); // GeoJSON is [lon, lat], Leaflet is [lat, lon]
     
     state.routingLine = L.polyline(coords, {
-        color: '#ef4444',
+        color: '#32CD32',
         weight: 8,
         opacity: 0.9,
         lineCap: 'round',
@@ -422,10 +422,10 @@ async function pollDestinationStation() {
             
             const destIcon = L.divIcon({
                 html: `
-                    <div style="background:#ef4444;color:white;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;border:3px solid white;box-shadow:0 0 15px rgba(239,68,68,0.6);">
+                    <div style="background:#32CD32;color:white;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;border:3px solid white;box-shadow:0 0 15px rgba(50,205,50,0.6);">
                         ${eBikes}
                     </div>
-                    <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:10px solid #ef4444;margin:-2px auto 0;"></div>
+                    <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:10px solid #32CD32;margin:-2px auto 0;"></div>
                 `,
                 className: '',
                 iconSize: [36, 46],
