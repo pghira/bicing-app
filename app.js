@@ -115,7 +115,7 @@ function startCompass() {
         
         if (state.isNavigating) {
             // 3D Tilt Mode: Map rotates, Arrow points strictly UP relative to screen
-            ui.mapEl.style.transform = `scale(1.5) rotateX(60deg) rotateZ(${-state.heading}deg)`;
+            ui.mapEl.style.transform = `scale(1.1) rotateX(60deg) rotateZ(${-state.heading}deg)`;
             if (state.arrowEl) state.arrowEl.style.transform = `rotate(0deg)`;
         } else {
             // Flat 2D Mode: Map stays still, Arrow spins to show direction
