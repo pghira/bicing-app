@@ -1,7 +1,8 @@
 const state = {
     threshold: parseInt(localStorage.getItem('bicingThreshold')) || 2,
     userPos: [41.3851, 2.1734], // Fixed location (Plaça de Catalunya) for PC testing
-    stations: [],
+    cachedStations: [],
+    lastFetchTime: 0,
     map: null,
     userMarker: null,
     arrowEl: null,
@@ -12,7 +13,7 @@ const state = {
     heading: 0,
     isNavigating: false,
     smouOpened: false,
-    pollInterval: null,
+    backgroundInterval: null,
     hasBeeped: false
 };
 
@@ -209,18 +210,25 @@ function updateUserMarker() {
     }
 }
 
-// Fetch Stations
-async function fetchStations() {
-    notify('Fetching real-time bicing data...', 'info', 2000);
-    const url = `https://api.citybik.es/v2/networks/bicing`;
+// Fetch Stations (with caching)
+async function fetchStations(forceNetwork = false) {
+    const now = Date.now();
+    if (!forceNetwork && state.cachedStations.length > 0 && now - state.lastFetchTime < 14000) {
+        return state.cachedStations; // Instant cache return
+    }
     
+    if (!forceNetwork) notify('Fetching real-time bicing data...', 'info', 2000);
+    
+    const url = `https://api.citybik.es/v2/networks/bicing`;
     const response = await fetch(url);
     if (!response.ok) {
         throw new Error(`API Error: ${response.status}`);
     }
     
     const data = await response.json();
-    return data.network.stations || [];
+    state.cachedStations = data.network.stations || [];
+    state.lastFetchTime = Date.now();
+    return state.cachedStations;
 }
 
 // Haversine Distance (km)
@@ -236,15 +244,15 @@ function calcDistance(lat1, lon1, lat2, lon2) {
 }
 
 // Find Nearest Station with E-Bikes
-async function findNearestStation() {
+async function findNearestStation(autoMode = false) {
     try {
-        ui.findBtn.disabled = true;
+        if (!autoMode) ui.findBtn.disabled = true;
         state.smouOpened = false; // Reset smou trigger
         
-        // 1. Get Location
+        // 1. Get Location (instant if already watching)
         await getUserLocation();
         
-        // 2. Fetch Data
+        // 2. Fetch Data (instant from cache)
         const stations = await fetchStations();
         
         // 3. Filter by E-Bikes Threshold
@@ -254,11 +262,11 @@ async function findNearestStation() {
         });
         
         if (validStations.length === 0) {
-            notify(`No stations found with ${state.threshold}+ e-bikes`, 'error');
-            return;
+            if (!autoMode) notify(`No stations found with ${state.threshold}+ e-bikes`, 'error');
+            return null;
         }
         
-        // 4. Find Closest (As the crow flies just for initial fast filtering)
+        // 4. Find Closest
         let closest = null;
         let minDistance = Infinity;
         
@@ -273,15 +281,20 @@ async function findNearestStation() {
             }
         });
         
-        // 5. Fetch Actual Street Routing (BRouter with OSRM fallback)
-        notify('Calculating footpaths...', 'info', 2000);
+        if (autoMode && state.destId === closest.station.id && state.isNavigating) {
+            // Already navigating to the best one, do nothing
+            return closest;
+        }
+        
+        // 5. Fetch Actual Street Routing
+        if (!autoMode) notify('Calculating footpaths...', 'info', 2000);
         
         let activeRouteGeometry = null;
         let walkTime = 0;
         let distMeters = 0;
 
         try {
-            // Try BRouter first (best for pedestrians/parks)
+            // Try BRouter first
             const brouterUrl = `https://brouter.de/brouter?lonlats=${state.userPos[1]},${state.userPos[0]}|${closest.lon},${closest.lat}&profile=shortest&alternativeidx=0&format=geojson`;
             const res = await fetch(brouterUrl);
             if (!res.ok) throw new Error("BRouter HTTP Error");
@@ -292,8 +305,7 @@ async function findNearestStation() {
             walkTime = Math.round(parseInt(data.features[0].properties['total-time']) / 60);
             distMeters = parseInt(data.features[0].properties['track-length']);
         } catch (err) {
-            console.warn("BRouter failed, falling back to OSRM:", err);
-            // Fallback to OSRM (bulletproof snapping for coastal/weird areas)
+            // Fallback to OSRM
             const osrmUrl = `https://router.project-osrm.org/route/v1/foot/${state.userPos[1]},${state.userPos[0]};${closest.lon},${closest.lat}?overview=full&geometries=geojson`;
             const res = await fetch(osrmUrl);
             if (!res.ok) throw new Error("Navigation engines offline.");
@@ -309,17 +321,13 @@ async function findNearestStation() {
         state.isNavigating = true;
         drawDestination(closest, activeRouteGeometry, walkTime, distMeters);
         
-        notify(`GO! ~${walkTime} min walk`, 'success', 5000);
+        if (!autoMode) notify(`GO! ~${walkTime} min walk`, 'success', 5000);
         
-        // 7. Start Live Polling for "Run Mode"
-        if (state.pollInterval) clearInterval(state.pollInterval);
-        state.hasBeeped = false;
-        state.pollInterval = setInterval(pollDestinationStation, 15000);
-        
+        return closest;
     } catch (err) {
-        notify(err.message, 'error', 4000);
+        if (!autoMode) notify(err.message, 'error', 4000);
     } finally {
-        ui.findBtn.disabled = false;
+        if (!autoMode) ui.findBtn.disabled = false;
     }
 }
 
@@ -407,15 +415,20 @@ function triggerRunAlarm() {
     osc.stop(audioCtx.currentTime + 0.5);
 }
 
-async function pollDestinationStation() {
-    if (!state.isNavigating || !state.destId) return;
+async function backgroundEngine() {
     try {
-        const stations = await fetchStations();
+        // 1. Fetch new data silently
+        const stations = await fetchStations(true);
+        
+        if (!state.isNavigating || !state.destId) return;
+        
+        // 2. Locate current destination
         const destStation = stations.find(s => s.id === state.destId);
         if (!destStation) return;
         
         const eBikes = destStation.extra?.ebikes ?? 0;
         
+        // Update marker UI silently
         if (state.destMarker) {
             const popup = state.destMarker.getPopup();
             if (popup) popup.setContent(`<b>${destStation.name || 'Bicing Station'}</b><br>${eBikes} E-Bikes available`);
@@ -434,14 +447,46 @@ async function pollDestinationStation() {
             state.destMarker.setIcon(destIcon);
         }
         
-        // Trigger run mode alarm if drops to <= 1
-        if (eBikes <= 1 && !state.hasBeeped) {
-            state.hasBeeped = true; // Only beep once to avoid annoyance
-            notify(`RUN! Only ${eBikes} e-bike left!`, 'error', 8000);
+        // 3. Condition A: Destination Empty (Auto-Reroute)
+        if (eBikes < state.threshold) {
+            notify("Station empty! Rerouting...", "error", 5000);
+            triggerRunAlarm();
+            await findNearestStation(true);
+            return;
+        }
+        
+        // 4. Condition B: Closer Station Appeared (Auto-Reroute)
+        const currentDist = calcDistance(state.userPos[0], state.userPos[1], destStation.latitude, destStation.longitude);
+        
+        let bestStation = null;
+        let bestDist = Infinity;
+        stations.forEach(s => {
+            const b = s.extra?.ebikes ?? 0;
+            if (b >= state.threshold) {
+                const d = calcDistance(state.userPos[0], state.userPos[1], s.latitude, s.longitude);
+                if (d < bestDist) {
+                    bestDist = d;
+                    bestStation = s;
+                }
+            }
+        });
+        
+        // If best station saves > 50 meters, reroute!
+        if (bestStation && bestStation.id !== state.destId && (currentDist - bestDist) > 0.05) {
+            notify("Closer bike found! Rerouting...", "success", 5000);
+            triggerRunAlarm();
+            await findNearestStation(true);
+            return;
+        }
+        
+        // 5. Beep if exactly 1 left
+        if (eBikes === 1 && !state.hasBeeped) {
+            state.hasBeeped = true; // Only beep once
+            notify(`RUN! Only 1 e-bike left!`, 'error', 8000);
             triggerRunAlarm();
         }
     } catch(err) {
-        console.warn("Live poll failed", err);
+        console.warn("Background engine failed", err);
     }
 }
 
@@ -450,10 +495,18 @@ window.onload = () => {
     initMap();
     bindEvents();
     
-    // Automatically try to get real GPS location at startup and instantly start navigating
-    getUserLocation().then(() => {
-        findNearestStation();
-    }).catch(e => console.warn(e));
+    // Zero-Latency Parallel Startup
+    const gpsPromise = getUserLocation().catch(e => console.warn(e));
+    const apiPromise = fetchStations(true).catch(e => console.warn(e));
+    
+    Promise.all([gpsPromise, apiPromise]).then(() => {
+        // Find best station instantly
+        findNearestStation(true);
+        
+        // Start Autonomous Background Engine
+        if (state.backgroundInterval) clearInterval(state.backgroundInterval);
+        state.backgroundInterval = setInterval(backgroundEngine, 15000);
+    });
     
     // Register PWA Service Worker
     if ('serviceWorker' in navigator) {
