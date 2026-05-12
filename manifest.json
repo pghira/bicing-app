@@ -1,6 +1,6 @@
 {
-  "name": "goBcn",
-  "short_name": "goBcn",
+  "name": "Bora",
+  "short_name": "Bora",
   "description": "Lightning fast nearest e-bike locator for Barcelona.",
   "start_url": "./index.html",
   "display": "standalone",

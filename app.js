@@ -4,10 +4,13 @@ const state = {
     stations: [],
     map: null,
     userMarker: null,
+    arrowEl: null,
     destMarker: null,
+    destPos: null,
     routingLine: null,
     heading: 0,
-    isNavigating: false
+    isNavigating: false,
+    smouOpened: false
 };
 
 // DOM Elements
@@ -36,6 +39,17 @@ function initMap() {
     }).addTo(state.map);
     
     L.control.zoom({ position: 'bottomright' }).addTo(state.map);
+
+    // If user interacts with map, snap out of 3D compass mode so they can pan normally
+    state.map.on('dragstart', () => {
+        state.isNavigating = false;
+        ui.mapEl.style.transform = 'none';
+        
+        // Ensure compass arrow keeps updating in flat mode
+        if (state.arrowEl) {
+            state.arrowEl.style.transform = `rotate(${state.heading}deg)`;
+        }
+    });
 
     // Allow manual location override via click
     state.map.on('click', (e) => {
@@ -88,20 +102,26 @@ function bindEvents() {
 
 function startCompass() {
     window.addEventListener('deviceorientation', (e) => {
-        if (!state.isNavigating) return;
-        
         // Calculate true heading
         let dir = 0;
         if (e.webkitCompassHeading) {
             dir = e.webkitCompassHeading; // iOS
         } else {
-            dir = 360 - e.alpha; // Android (rough approximation, absolute orientation is better but this works for demo)
+            dir = 360 - e.alpha; // Android
         }
-        
         state.heading = dir;
         
-        // Apply 3D perspective and rotation to the map
-        ui.mapEl.style.transform = `scale(1.5) rotateX(60deg) rotateZ(${-state.heading}deg)`;
+        state.arrowEl = document.getElementById('user-arrow');
+        
+        if (state.isNavigating) {
+            // 3D Tilt Mode: Map rotates, Arrow points strictly UP relative to screen
+            ui.mapEl.style.transform = `scale(1.5) rotateX(60deg) rotateZ(${-state.heading}deg)`;
+            if (state.arrowEl) state.arrowEl.style.transform = `rotate(0deg)`;
+        } else {
+            // Flat 2D Mode: Map stays still, Arrow spins to show direction
+            ui.mapEl.style.transform = 'none';
+            if (state.arrowEl) state.arrowEl.style.transform = `rotate(${state.heading}deg)`;
+        }
     }, true);
 }
 
@@ -145,6 +165,17 @@ function getUserLocation() {
                 state.userPos = [position.coords.latitude, position.coords.longitude];
                 updateUserMarker();
                 
+                // Geofencing: Auto-open Smou app if within 15 meters
+                if (state.isNavigating && state.destPos && !state.smouOpened) {
+                    const distToStation = calcDistance(state.userPos[0], state.userPos[1], state.destPos[0], state.destPos[1]) * 1000;
+                    if (distToStation < 15) {
+                        state.smouOpened = true;
+                        notify("Arrived! Opening Smou app...", "success", 5000);
+                        // Deep link to Smou app
+                        window.location.href = "intent://#Intent;package=cat.bsm.smou;scheme=smou;end;";
+                    }
+                }
+                
                 if (!initialResolved) {
                     initialResolved = true;
                     resolve(state.userPos);
@@ -167,14 +198,19 @@ function updateUserMarker() {
     if (state.userMarker) {
         state.userMarker.setLatLng(state.userPos);
     } else {
+        // Create blue dot with directional arrow
         const userIcon = L.divIcon({
-            html: '<div style="width:16px;height:16px;background:#3b82f6;border-radius:50%;border:3px solid white;box-shadow:0 0 10px rgba(59,130,246,0.8);"></div>',
+            html: `
+                <div style="position:relative;width:32px;height:32px;display:flex;align-items:center;justify-content:center;">
+                    <div style="width:16px;height:16px;background:#3b82f6;border-radius:50%;border:3px solid white;box-shadow:0 0 10px rgba(59,130,246,0.8);z-index:2;position:absolute;"></div>
+                    <div id="user-arrow" style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:14px solid #ef4444;position:absolute;top:0px;z-index:1;transform-origin: 8px 16px;transition: transform 0.1s linear;"></div>
+                </div>
+            `,
             className: '',
-            iconSize: [16, 16],
-            iconAnchor: [8, 8]
+            iconSize: [32, 32],
+            iconAnchor: [16, 16]
         });
-        state.userMarker = L.marker(state.userPos, { icon: userIcon }).addTo(state.map);
-        state.map.setView(state.userPos, 15);
+        state.userMarker = L.marker(state.userPos, { icon: userIcon, zIndexOffset: 1000 }).addTo(state.map);
     }
 }
 
@@ -208,6 +244,7 @@ function calcDistance(lat1, lon1, lat2, lon2) {
 async function findNearestStation() {
     try {
         ui.findBtn.disabled = true;
+        state.smouOpened = false; // Reset smou trigger
         
         // 1. Get Location
         await getUserLocation();
@@ -289,7 +326,7 @@ async function findNearestStation() {
 function drawDestination(dest, routeGeometry, walkTime, distMeters) {
     const s = dest.station;
     const eBikes = s.extra?.ebikes ?? 0;
-    const destPos = [dest.lat, dest.lon];
+    state.destPos = [dest.lat, dest.lon]; // Save globally for geofencing
     
     // Clear old
     if (state.destMarker) state.map.removeLayer(state.destMarker);
@@ -298,29 +335,29 @@ function drawDestination(dest, routeGeometry, walkTime, distMeters) {
     // Create custom marker with e-bike count
     const destIcon = L.divIcon({
         html: `
-            <div style="background:var(--success);color:white;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;border:3px solid white;box-shadow:0 0 15px rgba(16,185,129,0.6);">
+            <div style="background:#ef4444;color:white;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;border:3px solid white;box-shadow:0 0 15px rgba(239,68,68,0.6);">
                 ${eBikes}
             </div>
-            <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:10px solid var(--success);margin:-2px auto 0;"></div>
+            <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:10px solid #ef4444;margin:-2px auto 0;"></div>
         `,
         className: '',
         iconSize: [36, 46],
         iconAnchor: [18, 46]
     });
     
-    state.destMarker = L.marker(destPos, { icon: destIcon }).addTo(state.map);
+    state.destMarker = L.marker(state.destPos, { icon: destIcon }).addTo(state.map);
     state.destMarker.bindPopup(`<b>${s.name || 'Bicing Station'}</b><br>${eBikes} E-Bikes available`).openPopup();
     
     // Draw real street routing geometry (GeoJSON)
     const coords = routeGeometry.coordinates.map(c => [c[1], c[0]]); // GeoJSON is [lon, lat], Leaflet is [lat, lon]
     
     state.routingLine = L.polyline(coords, {
-        color: '#10b981',
+        color: '#ef4444',
         weight: 8,
         opacity: 0.9,
         lineCap: 'round',
         lineJoin: 'round',
-        dashArray: '1, 15' // Makes it look a bit like dots
+        dashArray: '1, 15'
     }).addTo(state.map);
     
     // Critical: Force Leaflet to update its internal size immediately
@@ -340,8 +377,15 @@ window.onload = () => {
     initMap();
     bindEvents();
     
-    // Automatically try to get real GPS location at startup
-    getUserLocation();
+    // Automatically try to get real GPS location at startup and instantly start navigating
+    getUserLocation().then(() => {
+        findNearestStation();
+    }).catch(e => console.warn(e));
+    
+    // Register PWA Service Worker
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(err => console.error(err));
+    }
     
     // Fix Leaflet layout bug inside flex containers
     setTimeout(() => state.map.invalidateSize(), 100);
