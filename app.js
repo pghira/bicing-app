@@ -54,18 +54,6 @@ function initMap() {
             state.arrowEl.style.transform = `rotate(${state.heading}deg)`;
         }
     });
-
-    // Allow manual location override via click
-    state.map.on('click', (e) => {
-        state.userPos = [e.latlng.lat, e.latlng.lng];
-        updateUserMarker();
-        notify('Manual location set!', 'success', 2000);
-        
-        // Auto-find nearest if they already clicked find before
-        if (state.destMarker) {
-            findNearestStation();
-        }
-    });
 }
 
 // Notification System
