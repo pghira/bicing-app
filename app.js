@@ -244,7 +244,7 @@ async function findNearestStation() {
         // 5. Fetch Actual Street Routing from BRouter (Pedestrian logic)
         notify('Calculating footpaths...', 'info', 2000);
         
-        const brouterUrl = `https://brouter.de/brouter?lonlats=${state.userPos[1]},${state.userPos[0]}|${closest.lon},${closest.lat}&profile=foot&alternativeidx=0&format=geojson`;
+        const brouterUrl = `https://brouter.de/brouter?lonlats=${state.userPos[1]},${state.userPos[0]}|${closest.lon},${closest.lat}&profile=shortest&alternativeidx=0&format=geojson`;
         const routeRes = await fetch(brouterUrl);
         if (!routeRes.ok) throw new Error("Could not fetch foot route.");
         
