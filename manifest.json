@@ -1,6 +1,6 @@
 {
-  "name": "Fast Bicing Finder",
-  "short_name": "Bicing",
+  "name": "goBcn",
+  "short_name": "goBcn",
   "description": "Lightning fast nearest e-bike locator for Barcelona.",
   "start_url": "./index.html",
   "display": "standalone",

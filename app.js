@@ -1,4 +1,3 @@
-// Configuration & State
 const state = {
     threshold: parseInt(localStorage.getItem('bicingThreshold')) || 2,
     userPos: [41.3851, 2.1734], // Fixed location (Plaça de Catalunya) for PC testing
@@ -6,11 +5,14 @@ const state = {
     map: null,
     userMarker: null,
     destMarker: null,
-    routingLine: null
+    routingLine: null,
+    heading: 0,
+    isNavigating: false
 };
 
 // DOM Elements
 const ui = {
+    mapEl: document.getElementById('map'),
     settingsBtn: document.getElementById('settings-btn'),
     findBtn: document.getElementById('find-btn'),
     locateBtn: document.getElementById('locate-btn'),
@@ -67,12 +69,40 @@ function bindEvents() {
     ui.settingsBtn.addEventListener('click', openSettings);
     ui.closeSettingsBtn.addEventListener('click', closeSettings);
     ui.saveSettingsBtn.addEventListener('click', saveSettings);
-    ui.findBtn.addEventListener('click', findNearestStation);
-    if(ui.locateBtn) {
-        ui.locateBtn.addEventListener('click', () => {
-            getUserLocation().then(pos => state.map.setView(pos, 15)).catch(err => notify(err.message, 'error'));
-        });
-    }
+    ui.findBtn.addEventListener('click', () => {
+        // Request compass permission on iOS on first interaction
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            DeviceOrientationEvent.requestPermission()
+                .then(permissionState => {
+                    if (permissionState === 'granted') {
+                        startCompass();
+                    }
+                })
+                .catch(console.error);
+        } else {
+            startCompass(); // Non-iOS
+        }
+        findNearestStation();
+    });
+}
+
+function startCompass() {
+    window.addEventListener('deviceorientation', (e) => {
+        if (!state.isNavigating) return;
+        
+        // Calculate true heading
+        let dir = 0;
+        if (e.webkitCompassHeading) {
+            dir = e.webkitCompassHeading; // iOS
+        } else {
+            dir = 360 - e.alpha; // Android (rough approximation, absolute orientation is better but this works for demo)
+        }
+        
+        state.heading = dir;
+        
+        // Apply 3D perspective and rotation to the map
+        ui.mapEl.style.transform = `scale(1.5) rotateX(60deg) rotateZ(${-state.heading}deg)`;
+    }, true);
 }
 
 function openSettings() {
@@ -211,25 +241,29 @@ async function findNearestStation() {
             }
         });
         
-        // 5. Fetch Actual Street Routing from OSRM
-        notify('Calculating street walking route...', 'info', 2000);
+        // 5. Fetch Actual Street Routing from BRouter (Pedestrian logic)
+        notify('Calculating footpaths...', 'info', 2000);
         
-        const osrmUrl = `https://router.project-osrm.org/route/v1/foot/${state.userPos[1]},${state.userPos[0]};${closest.lon},${closest.lat}?overview=full&geometries=geojson`;
-        const routeRes = await fetch(osrmUrl);
-        if (!routeRes.ok) throw new Error("Could not fetch street route.");
+        const brouterUrl = `https://brouter.de/brouter?lonlats=${state.userPos[1]},${state.userPos[0]}|${closest.lon},${closest.lat}&profile=foot&alternativeidx=0&format=geojson`;
+        const routeRes = await fetch(brouterUrl);
+        if (!routeRes.ok) throw new Error("Could not fetch foot route.");
         
         const routeData = await routeRes.json();
-        if (routeData.code !== 'Ok' || !routeData.routes || routeData.routes.length === 0) {
+        if (!routeData.features || routeData.features.length === 0) {
             throw new Error("No walking route found.");
         }
         
-        const activeRoute = routeData.routes[0];
+        const activeRoute = routeData.features[0];
         
         // 6. Draw on Map
+        state.isNavigating = true;
         drawDestination(closest, activeRoute);
         
-        const walkTime = Math.round(activeRoute.duration / 60);
-        notify(`Found nearest e-bikes! ~${walkTime} min walk along streets`, 'success', 5000);
+        // Convert BRouter 'total-time' string to integer seconds
+        const rawTime = activeRoute.properties['total-time']; // usually "123"
+        const walkTime = Math.round(parseInt(rawTime) / 60);
+        
+        notify(`GO! ~${walkTime} min walk through streets`, 'success', 5000);
         
     } catch (err) {
         notify(err.message, 'error', 4000);
@@ -263,32 +297,31 @@ function drawDestination(dest, route) {
     state.destMarker = L.marker(destPos, { icon: destIcon }).addTo(state.map);
     state.destMarker.bindPopup(`<b>${s.name || 'Bicing Station'}</b><br>${eBikes} E-Bikes available`).openPopup();
     
-    // Draw real street routing geometry
+    // Draw real street routing geometry (BRouter GeoJSON)
     const coords = route.geometry.coordinates.map(c => [c[1], c[0]]); // GeoJSON is [lon, lat], Leaflet is [lat, lon]
     
     state.routingLine = L.polyline(coords, {
         color: '#10b981',
-        weight: 6,
-        opacity: 0.8,
+        weight: 8,
+        opacity: 0.9,
         lineCap: 'round',
-        lineJoin: 'round'
+        lineJoin: 'round',
+        dashArray: '1, 15' // Makes it look a bit like dots
     }).addTo(state.map);
     
-    // Critical: Force Leaflet to update its internal size immediately before zooming
+    // Critical: Force Leaflet to update its internal size immediately
     state.map.invalidateSize(true);
     
-    // Auto-frame the miniature map around the route
-    state.map.fitBounds(state.routingLine.getBounds(), {
-        padding: [30, 30],
-        maxZoom: 17,
-        animate: true,
-        duration: 1
-    });
+    // Zoom in hard to the user's location for 3D navigation!
+    state.map.setView(state.userPos, 19, { animate: true, duration: 1.5 });
 
     // Update Dashboard UI with real street stats
-    const walkTime = Math.round(route.duration / 60);
+    const rawTime = route.properties['total-time'];
+    const walkTime = Math.round(parseInt(rawTime) / 60);
     ui.etaText.textContent = `${walkTime} min`;
-    ui.distText.textContent = `${Math.round(route.distance)} m`;
+    
+    const distMeters = route.properties['track-length'];
+    ui.distText.textContent = `${distMeters} m`;
     ui.routeStats.classList.remove('hidden');
 }
 
