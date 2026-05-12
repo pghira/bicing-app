@@ -31,9 +31,12 @@
         <!-- Floating Header -->
         <div class="floating-header">
             <h1>Bora</h1>
-            <button id="settings-btn" class="glass-btn icon-only">
-                ⚙️
-            </button>
+            <div style="display:flex; gap: 10px; align-items:center;">
+                <div id="compass-icon" style="font-size: 1.8rem; transition: transform 0.1s linear; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5));">🧭</div>
+                <button id="settings-btn" class="glass-btn icon-only">
+                    ⚙️
+                </button>
+            </div>
         </div>
 
         <!-- Floating Dashboard (Bottom) -->
@@ -76,6 +79,6 @@
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <script src="app.js?v=9"></script>
+    <script src="app.js?v=10"></script>
 </body>
 </html>

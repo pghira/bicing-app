@@ -7,15 +7,19 @@ const state = {
     arrowEl: null,
     destMarker: null,
     destPos: null,
+    destId: null,
     routingLine: null,
     heading: 0,
     isNavigating: false,
-    smouOpened: false
+    smouOpened: false,
+    pollInterval: null,
+    hasBeeped: false
 };
 
 // DOM Elements
 const ui = {
     mapEl: document.getElementById('map'),
+    compassIcon: document.getElementById('compass-icon'),
     settingsBtn: document.getElementById('settings-btn'),
     findBtn: document.getElementById('find-btn'),
     locateBtn: document.getElementById('locate-btn'),
@@ -113,10 +117,15 @@ function startCompass() {
         
         state.arrowEl = document.getElementById('user-arrow');
         
+        // The top-right UI compass always points North (counter-rotates against heading)
+        if (ui.compassIcon) ui.compassIcon.style.transform = `rotate(${-state.heading}deg)`;
+        
         if (state.isNavigating) {
-            // 3D Tilt Mode: Map rotates, Arrow points strictly UP relative to screen
+            // 3D Tilt Mode: Map rotates to face forward
             ui.mapEl.style.transform = `scale(1.7) rotateX(60deg) rotateZ(${-state.heading}deg)`;
-            if (state.arrowEl) state.arrowEl.style.transform = `rotate(0deg)`;
+            // Arrow points UP on the screen (which matches where you are looking)
+            // Because map is rotated -heading, arrow must rotate +heading to stay upright
+            if (state.arrowEl) state.arrowEl.style.transform = `rotate(${state.heading}deg)`;
         } else {
             // Flat 2D Mode: Map stays still, Arrow spins to show direction
             ui.mapEl.style.transform = 'none';
@@ -316,6 +325,11 @@ async function findNearestStation() {
         
         notify(`GO! ~${walkTime} min walk`, 'success', 5000);
         
+        // 7. Start Live Polling for "Run Mode"
+        if (state.pollInterval) clearInterval(state.pollInterval);
+        state.hasBeeped = false;
+        state.pollInterval = setInterval(pollDestinationStation, 15000);
+        
     } catch (err) {
         notify(err.message, 'error', 4000);
     } finally {
@@ -327,6 +341,7 @@ function drawDestination(dest, routeGeometry, walkTime, distMeters) {
     const s = dest.station;
     const eBikes = s.extra?.ebikes ?? 0;
     state.destPos = [dest.lat, dest.lon]; // Save globally for geofencing
+    state.destId = s.id; // Save globally for polling
     
     // Clear old
     if (state.destMarker) state.map.removeLayer(state.destMarker);
@@ -370,6 +385,78 @@ function drawDestination(dest, routeGeometry, walkTime, distMeters) {
     ui.etaText.textContent = `${walkTime} min`;
     ui.distText.textContent = `${distMeters} m`;
     ui.routeStats.classList.remove('hidden');
+}
+
+// --- LIVE POLLING & AUDIO ALARM ---
+let audioCtx = null;
+
+function triggerRunAlarm() {
+    // Flash red UI
+    const wrapper = document.querySelector('.app-wrapper');
+    if (wrapper) {
+        wrapper.style.transition = "box-shadow 0.2s";
+        wrapper.style.boxShadow = "inset 0 0 100px 20px rgba(239, 68, 68, 0.8)";
+        setTimeout(() => wrapper.style.boxShadow = "none", 800);
+    }
+    
+    // Web Audio Synthesis beep
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime); // High pitch A5
+    osc.frequency.setValueAtTime(1108.73, audioCtx.currentTime + 0.1); // C#6
+    
+    gain.gain.setValueAtTime(0, audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(1, audioCtx.currentTime + 0.05);
+    gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
+    
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.5);
+}
+
+async function pollDestinationStation() {
+    if (!state.isNavigating || !state.destId) return;
+    try {
+        const stations = await fetchStations();
+        const destStation = stations.find(s => s.id === state.destId);
+        if (!destStation) return;
+        
+        const eBikes = destStation.extra?.ebikes ?? 0;
+        
+        if (state.destMarker) {
+            const popup = state.destMarker.getPopup();
+            if (popup) popup.setContent(`<b>${destStation.name || 'Bicing Station'}</b><br>${eBikes} E-Bikes available`);
+            
+            const destIcon = L.divIcon({
+                html: `
+                    <div style="background:#ef4444;color:white;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;border:3px solid white;box-shadow:0 0 15px rgba(239,68,68,0.6);">
+                        ${eBikes}
+                    </div>
+                    <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:10px solid #ef4444;margin:-2px auto 0;"></div>
+                `,
+                className: '',
+                iconSize: [36, 46],
+                iconAnchor: [18, 46]
+            });
+            state.destMarker.setIcon(destIcon);
+        }
+        
+        // Trigger run mode alarm if drops to <= 1
+        if (eBikes <= 1 && !state.hasBeeped) {
+            state.hasBeeped = true; // Only beep once to avoid annoyance
+            notify(`RUN! Only ${eBikes} e-bike left!`, 'error', 8000);
+            triggerRunAlarm();
+        }
+    } catch(err) {
+        console.warn("Live poll failed", err);
+    }
 }
 
 // Boot
