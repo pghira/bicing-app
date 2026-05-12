@@ -241,29 +241,43 @@ async function findNearestStation() {
             }
         });
         
-        // 5. Fetch Actual Street Routing from BRouter (Pedestrian logic)
+        // 5. Fetch Actual Street Routing (BRouter with OSRM fallback)
         notify('Calculating footpaths...', 'info', 2000);
         
-        const brouterUrl = `https://brouter.de/brouter?lonlats=${state.userPos[1]},${state.userPos[0]}|${closest.lon},${closest.lat}&profile=shortest&alternativeidx=0&format=geojson`;
-        const routeRes = await fetch(brouterUrl);
-        if (!routeRes.ok) throw new Error("Could not fetch foot route.");
-        
-        const routeData = await routeRes.json();
-        if (!routeData.features || routeData.features.length === 0) {
-            throw new Error("No walking route found.");
+        let activeRouteGeometry = null;
+        let walkTime = 0;
+        let distMeters = 0;
+
+        try {
+            // Try BRouter first (best for pedestrians/parks)
+            const brouterUrl = `https://brouter.de/brouter?lonlats=${state.userPos[1]},${state.userPos[0]}|${closest.lon},${closest.lat}&profile=shortest&alternativeidx=0&format=geojson`;
+            const res = await fetch(brouterUrl);
+            if (!res.ok) throw new Error("BRouter HTTP Error");
+            const data = await res.json();
+            if (!data.features || data.features.length === 0) throw new Error("No BRouter route");
+            
+            activeRouteGeometry = data.features[0].geometry;
+            walkTime = Math.round(parseInt(data.features[0].properties['total-time']) / 60);
+            distMeters = parseInt(data.features[0].properties['track-length']);
+        } catch (err) {
+            console.warn("BRouter failed, falling back to OSRM:", err);
+            // Fallback to OSRM (bulletproof snapping for coastal/weird areas)
+            const osrmUrl = `https://router.project-osrm.org/route/v1/foot/${state.userPos[1]},${state.userPos[0]};${closest.lon},${closest.lat}?overview=full&geometries=geojson`;
+            const res = await fetch(osrmUrl);
+            if (!res.ok) throw new Error("Navigation engines offline.");
+            const data = await res.json();
+            if (data.code !== 'Ok' || !data.routes || data.routes.length === 0) throw new Error("No walking route found.");
+            
+            activeRouteGeometry = data.routes[0].geometry;
+            walkTime = Math.round(data.routes[0].duration / 60);
+            distMeters = Math.round(data.routes[0].distance);
         }
-        
-        const activeRoute = routeData.features[0];
         
         // 6. Draw on Map
         state.isNavigating = true;
-        drawDestination(closest, activeRoute);
+        drawDestination(closest, activeRouteGeometry, walkTime, distMeters);
         
-        // Convert BRouter 'total-time' string to integer seconds
-        const rawTime = activeRoute.properties['total-time']; // usually "123"
-        const walkTime = Math.round(parseInt(rawTime) / 60);
-        
-        notify(`GO! ~${walkTime} min walk through streets`, 'success', 5000);
+        notify(`GO! ~${walkTime} min walk`, 'success', 5000);
         
     } catch (err) {
         notify(err.message, 'error', 4000);
@@ -272,7 +286,7 @@ async function findNearestStation() {
     }
 }
 
-function drawDestination(dest, route) {
+function drawDestination(dest, routeGeometry, walkTime, distMeters) {
     const s = dest.station;
     const eBikes = s.extra?.ebikes ?? 0;
     const destPos = [dest.lat, dest.lon];
@@ -297,8 +311,8 @@ function drawDestination(dest, route) {
     state.destMarker = L.marker(destPos, { icon: destIcon }).addTo(state.map);
     state.destMarker.bindPopup(`<b>${s.name || 'Bicing Station'}</b><br>${eBikes} E-Bikes available`).openPopup();
     
-    // Draw real street routing geometry (BRouter GeoJSON)
-    const coords = route.geometry.coordinates.map(c => [c[1], c[0]]); // GeoJSON is [lon, lat], Leaflet is [lat, lon]
+    // Draw real street routing geometry (GeoJSON)
+    const coords = routeGeometry.coordinates.map(c => [c[1], c[0]]); // GeoJSON is [lon, lat], Leaflet is [lat, lon]
     
     state.routingLine = L.polyline(coords, {
         color: '#10b981',
@@ -316,11 +330,7 @@ function drawDestination(dest, route) {
     state.map.setView(state.userPos, 19, { animate: true, duration: 1.5 });
 
     // Update Dashboard UI with real street stats
-    const rawTime = route.properties['total-time'];
-    const walkTime = Math.round(parseInt(rawTime) / 60);
     ui.etaText.textContent = `${walkTime} min`;
-    
-    const distMeters = route.properties['track-length'];
     ui.distText.textContent = `${distMeters} m`;
     ui.routeStats.classList.remove('hidden');
 }
