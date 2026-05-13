@@ -11,7 +11,8 @@ const state = {
     destId: null,
     routingLine: null,
     heading: 0,
-    isNavigating: false,
+    viewMode: 'overview', // 'overview' or 'nav'
+    isTracking: false,
     smouOpened: false,
     backgroundInterval: null,
     hasBeeped: false
@@ -23,6 +24,7 @@ const ui = {
     compassIcon: document.getElementById('compass-icon'),
     settingsBtn: document.getElementById('settings-btn'),
     findBtn: document.getElementById('find-btn'),
+    viewToggleBtn: document.getElementById('view-toggle-btn'),
     locateBtn: document.getElementById('locate-btn'),
     settingsModal: document.getElementById('settings-modal'),
     closeSettingsBtn: document.getElementById('close-settings'),
@@ -46,15 +48,10 @@ function initMap() {
     
     L.control.zoom({ position: 'bottomright' }).addTo(state.map);
 
-    // If user interacts with map, snap out of 3D compass mode so they can pan normally
+    // When user drags map, stop locking the camera to GPS, but KEEP the current 3D angle!
     state.map.on('dragstart', () => {
-        state.isNavigating = false;
-        ui.mapEl.style.transform = 'none';
-        
-        // Ensure compass arrow keeps updating in flat mode
-        if (state.arrowEl) {
-            state.arrowEl.style.transform = `rotate(${state.heading}deg)`;
-        }
+        state.isTracking = false;
+        ui.viewToggleBtn.innerHTML = '📍'; // Hint they can tap to recenter
     });
 }
 
@@ -75,6 +72,8 @@ function bindEvents() {
     ui.settingsBtn.addEventListener('click', openSettings);
     ui.closeSettingsBtn.addEventListener('click', closeSettings);
     ui.saveSettingsBtn.addEventListener('click', saveSettings);
+    ui.viewToggleBtn.addEventListener('click', toggleViewMode);
+    
     ui.findBtn.addEventListener('click', () => {
         // Request compass permission on iOS on first interaction
         if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -108,7 +107,7 @@ function startCompass() {
         // The top-right UI compass always points North (counter-rotates against heading)
         if (ui.compassIcon) ui.compassIcon.style.transform = `rotate(${-state.heading}deg)`;
         
-        if (state.isNavigating) {
+        if (state.viewMode === 'nav') {
             // 3D Tilt Mode: Map rotates to face forward
             ui.mapEl.style.transform = `scale(1.7) rotateX(60deg) rotateZ(${-state.heading}deg)`;
             // Arrow points UP on the screen (which matches where you are looking)
@@ -120,6 +119,35 @@ function startCompass() {
             if (state.arrowEl) state.arrowEl.style.transform = `rotate(${state.heading}deg)`;
         }
     }, true);
+}
+
+function toggleViewMode() {
+    if (state.viewMode === 'nav' && state.isTracking) {
+        // Switch to Overview
+        state.viewMode = 'overview';
+        state.isTracking = false;
+        ui.viewToggleBtn.innerHTML = '🚀'; // Rocket icon to go back to 3D nav
+        
+        ui.mapEl.style.transform = 'none';
+        if (state.arrowEl) state.arrowEl.style.transform = `rotate(${state.heading}deg)`;
+        
+        // Fit bounds to show route if exists
+        if (state.routingLine) {
+            state.map.fitBounds(state.routingLine.getBounds(), { padding: [50, 50], animate: true });
+        }
+    } else {
+        // Switch to 3D Nav (or Recenter if they dragged)
+        state.viewMode = 'nav';
+        state.isTracking = true;
+        ui.viewToggleBtn.innerHTML = '🗺️'; // Map icon to go to overview
+        
+        ui.mapEl.style.transform = `scale(1.7) rotateX(60deg) rotateZ(${-state.heading}deg)`;
+        if (state.arrowEl) state.arrowEl.style.transform = `rotate(${state.heading}deg)`;
+        
+        if (state.userPos) {
+            state.map.setView(state.userPos, 19, { animate: true, duration: 1.0 });
+        }
+    }
 }
 
 function openSettings() {
@@ -162,8 +190,13 @@ function getUserLocation() {
                 state.userPos = [position.coords.latitude, position.coords.longitude];
                 updateUserMarker();
                 
+                // Keep camera locked if tracking in 3D mode
+                if (state.isTracking && state.viewMode === 'nav') {
+                    state.map.setView(state.userPos, 19);
+                }
+                
                 // Geofencing: Auto-open Smou app if within 15 meters
-                if (state.isNavigating && state.destPos && !state.smouOpened) {
+                if (state.destPos && !state.smouOpened) {
                     const distToStation = calcDistance(state.userPos[0], state.userPos[1], state.destPos[0], state.destPos[1]) * 1000;
                     if (distToStation < 15) {
                         state.smouOpened = true;
@@ -319,7 +352,9 @@ async function findNearestStation(autoMode = false) {
         }
         
         // 6. Draw on Map
-        state.isNavigating = true;
+        state.viewMode = 'nav';
+        state.isTracking = true;
+        ui.viewToggleBtn.innerHTML = '🗺️';
         drawDestination(closest, activeRouteGeometry, walkTime, distMeters);
         
         if (!autoMode) notify(`GO! ~${walkTime} min walk`, 'success', 5000);
@@ -421,7 +456,7 @@ async function backgroundEngine() {
         // 1. Fetch new data silently
         const stations = await fetchStations(true);
         
-        if (!state.isNavigating || !state.destId) return;
+        if (!state.destId) return;
         
         // 2. Locate current destination
         const destStation = stations.find(s => s.id === state.destId);
