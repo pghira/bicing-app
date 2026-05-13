@@ -373,10 +373,8 @@ body {
     to { transform: translateY(-20px); opacity: 0; }
 }
 
-/* Dark mode map tiles */
-.leaflet-layer,
-.leaflet-control-zoom-in,
-.leaflet-control-zoom-out,
+/* Hide Leaflet Controls to make it look like a native app */
+.leaflet-control-zoom,
 .leaflet-control-attribution {
-    filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+    display: none !important;
 }

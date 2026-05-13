@@ -38,8 +38,9 @@ const ui = {
 function initMap() {
     state.map = L.map('map', { zoomControl: false }).setView([41.3851, 2.1734], 13);
     
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors',
+    // Minimalist Dark Map without labels or symbols
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
         maxZoom: 19
     }).addTo(state.map);
     
