@@ -162,14 +162,19 @@ function getUserLocation() {
                 state.userPos = [position.coords.latitude, position.coords.longitude];
                 updateUserMarker();
                 
-                // Geofencing: Auto-open Smou app if within 15 meters
+                // Keep the camera locked to the user while navigating
+                if (state.isNavigating) {
+                    state.map.setView(state.userPos, 19);
+                }
+                
+                // Geofencing: Auto-open Smou app if within 30 meters
                 if (state.isNavigating && state.destPos && !state.smouOpened) {
                     const distToStation = calcDistance(state.userPos[0], state.userPos[1], state.destPos[0], state.destPos[1]) * 1000;
-                    if (distToStation < 15) {
+                    if (distToStation < 30) {
                         state.smouOpened = true;
                         notify("Arrived! Opening Smou app...", "success", 5000);
-                        // Deep link to Smou app
-                        window.location.href = "intent://#Intent;package=cat.bsm.smou;scheme=smou;end;";
+                        // Deep link to Smou app (Attempting to trigger Bicing shortcut)
+                        window.location.href = "intent://bicing#Intent;scheme=smou;package=cat.bsm.smou;end;";
                     }
                 }
                 
