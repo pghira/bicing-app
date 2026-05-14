@@ -174,7 +174,7 @@ function getUserLocation() {
                         state.smouOpened = true;
                         notify("Arrived! Opening Smou app...", "success", 5000);
                         // Deep link to Smou app (Attempting to trigger Bicing shortcut)
-                        window.location.href = "intent://bicing#Intent;scheme=smou;package=cat.bsm.smou;end;";
+                        window.location.href = "intent://bicing#Intent;scheme=smou;package=cat.bcn.smoubcn;end;";
                     }
                 }
                 
