@@ -378,3 +378,8 @@ body {
 .leaflet-control-attribution {
     display: none !important;
 }
+
+/* Tint the dark map streets to a futuristic dark red and make them slightly brighter */
+.leaflet-layer {
+    filter: sepia(100%) hue-rotate(320deg) saturate(400%) brightness(130%);
+}
