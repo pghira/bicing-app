@@ -18,7 +18,7 @@
 }
 
 body {
-    background-color: #050a15; /* Dark background */
+    background-color: #000000; /* Dark background */
     color: #e2e8f0;
     overflow: hidden; /* Prevent scrolling like a native app */
     width: 100vw;
