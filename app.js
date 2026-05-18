@@ -173,8 +173,8 @@ function getUserLocation() {
                     if (distToStation < 30) {
                         state.smouOpened = true;
                         notify("Arrived! Opening Smou app...", "success", 5000);
-                        // Deep link to Smou app (Attempting to trigger Bicing shortcut)
-                        window.location.href = "intent://bicing#Intent;scheme=smou;package=cat.bcn.smoubcn;end;";
+                        // Launch Smou app directly via Android MAIN Intent (prevents Play Store fallback)
+                        window.location.href = "intent://#Intent;package=cat.bcn.smoubcn;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;end;";
                     }
                 }
                 
