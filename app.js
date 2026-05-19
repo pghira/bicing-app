@@ -47,15 +47,25 @@ function initMap() {
     
     L.control.zoom({ position: 'bottomright' }).addTo(state.map);
 
-    // Allow user to drag the map around freely. 
-    // Because CSS 3D rotation reverses swipe directions, we temporarily drop the map to flat 2D while they look around!
-    state.map.on('dragstart', () => {
-        state.isTracking = false;
-        state.isNavigating = false;
-        ui.mapEl.style.transform = 'none';
-        if (state.arrowEl) state.arrowEl.style.transform = `rotate(${state.heading}deg)`;
-        ui.compassIcon.style.opacity = '1'; // Compass now acts as recenter button
-    });
+    // When user touches the map, drop to 2D and zoom out to show the whole route!
+    const dropTo2D = () => {
+        if (state.isNavigating) {
+            state.isTracking = false;
+            state.isNavigating = false;
+            ui.mapEl.style.transform = 'none';
+            if (state.arrowEl) state.arrowEl.style.transform = `rotate(${state.heading}deg)`;
+            ui.compassIcon.style.opacity = '1'; // Compass now acts as recenter button
+            
+            // Zoom out to show both user and destination
+            if (state.userPos && state.destPos) {
+                state.map.fitBounds(L.latLngBounds([state.userPos, state.destPos]), { padding: [60, 60], animate: true, duration: 0.5 });
+            }
+        }
+    };
+
+    state.map.on('dragstart', dropTo2D);
+    state.map.on('mousedown', dropTo2D);
+    state.map.on('touchstart', dropTo2D);
 }
 
 // Notification System
