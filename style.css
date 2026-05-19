@@ -384,7 +384,3 @@ body {
     display: none !important;
 }
 
-/* Boost contrast of dark map so streets are bright gray and water is pure black */
-.leaflet-tile-pane {
-    filter: brightness(180%) contrast(1.5);
-}
