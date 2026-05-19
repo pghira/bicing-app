@@ -12,6 +12,7 @@ const state = {
     routingLine: null,
     heading: 0,
     isNavigating: false,
+    isTracking: false,
     smouOpened: false,
     backgroundInterval: null,
     hasBeeped: false
@@ -46,15 +47,10 @@ function initMap() {
     
     L.control.zoom({ position: 'bottomright' }).addTo(state.map);
 
-    // If user interacts with map, snap out of 3D compass mode so they can pan normally
+    // Allow user to drag the 3D map around. Just stop locking the camera to their GPS.
     state.map.on('dragstart', () => {
-        state.isNavigating = false;
-        ui.mapEl.style.transform = 'none';
-        
-        // Ensure compass arrow keeps updating in flat mode
-        if (state.arrowEl) {
-            state.arrowEl.style.transform = `rotate(${state.heading}deg)`;
-        }
+        state.isTracking = false;
+        // We DO NOT set isNavigating = false anymore. It stays in 3D and keeps compass rotation!
     });
 }
 
@@ -162,8 +158,8 @@ function getUserLocation() {
                 state.userPos = [position.coords.latitude, position.coords.longitude];
                 updateUserMarker();
                 
-                // Keep the camera locked to the user while navigating
-                if (state.isNavigating) {
+                // Keep the camera locked to the user while navigating ONLY if they haven't dragged away
+                if (state.isNavigating && state.isTracking) {
                     state.map.setView(state.userPos, 19);
                 }
                 
@@ -379,7 +375,11 @@ function drawDestination(dest, routeGeometry, walkTime, distMeters) {
     state.map.invalidateSize(true);
     
     // Zoom in hard to the user's location for 3D navigation!
+    state.isTracking = true; // Lock camera to GPS
     state.map.setView(state.userPos, 19, { animate: true, duration: 1.5 });
+    
+    // Instantly apply the 3D transform so they don't have to wait for the compass to move
+    ui.mapEl.style.transform = `scale(2.2) rotateX(75deg) rotateZ(${-state.heading}deg)`;
 
     // Update Dashboard UI with real street stats
     ui.etaText.textContent = `${walkTime} min`;
