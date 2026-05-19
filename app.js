@@ -58,7 +58,11 @@ function initMap() {
             
             // Zoom out to show both user and destination
             if (state.userPos && state.destPos) {
-                state.map.fitBounds(L.latLngBounds([state.userPos, state.destPos]), { padding: [60, 60], animate: true, duration: 0.5 });
+                // The map canvas is 300vw/300vh (to prevent 3D clipping), meaning there's 100vw of invisible padding on each side.
+                // To fit the bounds in the VISIBLE 100vw area, we must pad Leaflet by the invisible amounts!
+                const padX = window.innerWidth + 20;
+                const padY = window.innerHeight + 20;
+                state.map.fitBounds(L.latLngBounds([state.userPos, state.destPos]), { padding: [padX, padY], animate: true, duration: 0.5 });
             }
         }
     };

@@ -60,6 +60,11 @@ body {
     text-shadow: 0 4px 20px rgba(0,0,0,0.5);
 }
 
+#compass-icon {
+    pointer-events: auto;
+    cursor: pointer;
+}
+
 .floating-header button {
     pointer-events: auto;
 }
