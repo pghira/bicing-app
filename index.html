@@ -35,9 +35,6 @@
         <div class="floating-header">
             <h1>Bora</h1>
             <div style="display:flex; gap: 10px; align-items:center;">
-                <div id="compass-icon"
-                    style="font-size: 1.8rem; transition: transform 0.1s linear; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5));">
-                    🧭</div>
                 <button id="settings-btn" class="glass-btn icon-only">
                     ⚙️
                 </button>
@@ -79,12 +76,19 @@
         </div>
     </div>
 
+    <!-- Floating Recenter Button (Hidden by Default) -->
+    <button id="recenter-btn" class="glass-btn hidden" style="position: absolute; bottom: 120px; right: 20px; z-index: 2000; width: 64px; height: 64px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; background: rgba(50,205,50,0.8); border: 2px solid #32CD32; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5)); transition: all 0.2s;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="white" style="width: 32px; height: 32px; transform: rotate(-45deg) translate(-2px, 2px);">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+        </svg>
+    </button>
+
     <!-- Notification system -->
     <div id="notification-container"></div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <script src="app.js?v=29"></script>
+    <script src="app.js?v=30"></script>
 </body>
 
 </html>

@@ -21,7 +21,7 @@ const state = {
 // DOM Elements
 const ui = {
     mapEl: document.getElementById('map'),
-    compassIcon: document.getElementById('compass-icon'),
+    recenterBtn: document.getElementById('recenter-btn'),
     settingsBtn: document.getElementById('settings-btn'),
     findBtn: document.getElementById('find-btn'),
     locateBtn: document.getElementById('locate-btn'),
@@ -54,7 +54,8 @@ function initMap() {
             state.isNavigating = false;
             ui.mapEl.style.transform = 'none';
             if (state.arrowEl) state.arrowEl.style.transform = `rotate(${state.heading}deg)`;
-            ui.compassIcon.style.opacity = '1'; // Compass now acts as recenter button
+            
+            if (ui.recenterBtn) ui.recenterBtn.classList.remove('hidden');
             
             // Zoom out to show both user and destination
             if (state.userPos && state.destPos) {
@@ -86,15 +87,16 @@ function notify(msg, type = 'info', duration = 3000) {
 
 // Event Listeners
 function bindEvents() {
-    // Compass acts as a recenter button when panning in 2D
-    if (ui.compassIcon) {
-        ui.compassIcon.addEventListener('click', () => {
+    // Recenter button restores 3D navigation
+    if (ui.recenterBtn) {
+        ui.recenterBtn.addEventListener('click', () => {
             if (!state.isTracking && state.destPos) {
                 state.isTracking = true;
                 state.isNavigating = true;
                 state.map.setView(state.userPos, 19, { animate: true, duration: 1.0 });
                 ui.mapEl.style.transform = `scale(2.2) rotateX(75deg) rotateZ(${-state.heading}deg)`;
                 if (state.arrowEl) state.arrowEl.style.transform = `rotate(${state.heading}deg)`;
+                ui.recenterBtn.classList.add('hidden');
             }
         });
     }
@@ -131,9 +133,6 @@ function startCompass() {
         state.heading = dir;
         
         state.arrowEl = document.getElementById('user-arrow');
-        
-        // The top-right UI compass always points North (counter-rotates against heading)
-        if (ui.compassIcon) ui.compassIcon.style.transform = `rotate(${-state.heading}deg)`;
         
         if (state.isNavigating) {
             // 3D Tilt Mode: Map rotates to face forward (more tilted to see further ahead)
@@ -407,6 +406,8 @@ function drawDestination(dest, routeGeometry, walkTime, distMeters) {
     // Zoom in hard to the user's location for 3D navigation!
     state.isTracking = true; // Lock camera to GPS
     state.map.setView(state.userPos, 19, { animate: true, duration: 1.5 });
+    
+    if (ui.recenterBtn) ui.recenterBtn.classList.add('hidden');
     
     // Instantly apply the 3D transform so they don't have to wait for the compass to move
     ui.mapEl.style.transform = `scale(2.2) rotateX(75deg) rotateZ(${-state.heading}deg)`;
