@@ -384,7 +384,7 @@ body {
     display: none !important;
 }
 
-/* Apply a Negative-Invert Trick to the light map to create a dark mode where water stays blue */
+/* Boost contrast of dark map so streets are bright gray and water is pure black */
 .leaflet-tile-pane {
-    filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(1.2);
+    filter: brightness(180%) contrast(1.5);
 }
