@@ -384,7 +384,7 @@ body {
     display: none !important;
 }
 
-/* Tint the dark map streets to a futuristic dark red and make them slightly brighter */
-.leaflet-layer {
-    filter: sepia(100%) hue-rotate(320deg) saturate(400%) brightness(130%);
+/* Apply a Negative-Invert Trick to the light map to create a dark mode where water stays blue */
+.leaflet-tile-pane {
+    filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(1.2);
 }
