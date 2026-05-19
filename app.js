@@ -47,10 +47,14 @@ function initMap() {
     
     L.control.zoom({ position: 'bottomright' }).addTo(state.map);
 
-    // Allow user to drag the 3D map around. Just stop locking the camera to their GPS.
+    // Allow user to drag the map around freely. 
+    // Because CSS 3D rotation reverses swipe directions, we temporarily drop the map to flat 2D while they look around!
     state.map.on('dragstart', () => {
         state.isTracking = false;
-        // We DO NOT set isNavigating = false anymore. It stays in 3D and keeps compass rotation!
+        state.isNavigating = false;
+        ui.mapEl.style.transform = 'none';
+        if (state.arrowEl) state.arrowEl.style.transform = `rotate(${state.heading}deg)`;
+        ui.compassIcon.style.opacity = '1'; // Compass now acts as recenter button
     });
 }
 
@@ -68,6 +72,19 @@ function notify(msg, type = 'info', duration = 3000) {
 
 // Event Listeners
 function bindEvents() {
+    // Compass acts as a recenter button when panning in 2D
+    if (ui.compassIcon) {
+        ui.compassIcon.addEventListener('click', () => {
+            if (!state.isTracking && state.destPos) {
+                state.isTracking = true;
+                state.isNavigating = true;
+                state.map.setView(state.userPos, 19, { animate: true, duration: 1.0 });
+                ui.mapEl.style.transform = `scale(2.2) rotateX(75deg) rotateZ(${-state.heading}deg)`;
+                if (state.arrowEl) state.arrowEl.style.transform = `rotate(${state.heading}deg)`;
+            }
+        });
+    }
+
     ui.settingsBtn.addEventListener('click', openSettings);
     ui.closeSettingsBtn.addEventListener('click', closeSettings);
     ui.saveSettingsBtn.addEventListener('click', saveSettings);

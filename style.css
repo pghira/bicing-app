@@ -78,10 +78,10 @@ body {
 
 #map {
     position: absolute;
-    width: 200vw;
-    height: 200dvh;
-    top: -50dvh;
-    left: -50vw;
+    width: 300vw;
+    height: 300dvh;
+    top: -100dvh;
+    left: -100vw;
     /* We intentionally draw the map bigger so when tilted, it fills the screen without cropping */
     transform-origin: center center;
     transform-style: preserve-3d;
