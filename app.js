@@ -313,27 +313,27 @@ async function findNearestStation(autoMode = false) {
         let distMeters = 0;
 
         try {
-            // Try BRouter first
-            const brouterUrl = `https://brouter.de/brouter?lonlats=${state.userPos[1]},${state.userPos[0]}|${closest.lon},${closest.lat}&profile=shortest&alternativeidx=0&format=geojson`;
-            const res = await fetch(brouterUrl);
-            if (!res.ok) throw new Error("BRouter HTTP Error");
-            const data = await res.json();
-            if (!data.features || data.features.length === 0) throw new Error("No BRouter route");
-            
-            activeRouteGeometry = data.features[0].geometry;
-            walkTime = Math.round(parseInt(data.features[0].properties['total-time']) / 60);
-            distMeters = parseInt(data.features[0].properties['track-length']);
-        } catch (err) {
-            // Fallback to OSRM
+            // Try OSRM first (Incredibly fast CDN)
             const osrmUrl = `https://router.project-osrm.org/route/v1/foot/${state.userPos[1]},${state.userPos[0]};${closest.lon},${closest.lat}?overview=full&geometries=geojson`;
             const res = await fetch(osrmUrl);
-            if (!res.ok) throw new Error("Navigation engines offline.");
+            if (!res.ok) throw new Error("OSRM HTTP Error");
             const data = await res.json();
-            if (data.code !== 'Ok' || !data.routes || data.routes.length === 0) throw new Error("No walking route found.");
+            if (data.code !== 'Ok' || !data.routes || data.routes.length === 0) throw new Error("No OSRM route");
             
             activeRouteGeometry = data.routes[0].geometry;
             walkTime = Math.round(data.routes[0].duration / 60);
             distMeters = Math.round(data.routes[0].distance);
+        } catch (err) {
+            // Fallback to BRouter
+            const brouterUrl = `https://brouter.de/brouter?lonlats=${state.userPos[1]},${state.userPos[0]}|${closest.lon},${closest.lat}&profile=shortest&alternativeidx=0&format=geojson`;
+            const res = await fetch(brouterUrl);
+            if (!res.ok) throw new Error("Navigation engines offline.");
+            const data = await res.json();
+            if (!data.features || data.features.length === 0) throw new Error("No walking route found.");
+            
+            activeRouteGeometry = data.features[0].geometry;
+            walkTime = Math.round(parseInt(data.features[0].properties['total-time']) / 60);
+            distMeters = parseInt(data.features[0].properties['track-length']);
         }
         
         // 6. Draw on Map
@@ -520,6 +520,11 @@ window.onload = () => {
     // Zero-Latency Parallel Startup
     const gpsPromise = getUserLocation().catch(e => console.warn(e));
     const apiPromise = fetchStations(true).catch(e => console.warn(e));
+    
+    // Auto-start compass if not on iOS
+    if (!(typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function')) {
+        startCompass();
+    }
     
     Promise.all([gpsPromise, apiPromise]).then(() => {
         // Find best station instantly
