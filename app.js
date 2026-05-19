@@ -108,9 +108,9 @@ function startCompass() {
         // The top-right UI compass always points North (counter-rotates against heading)
         if (ui.compassIcon) ui.compassIcon.style.transform = `rotate(${-state.heading}deg)`;
         
-        if (state.viewMode === 'nav') {
+        if (state.isNavigating) {
             // 3D Tilt Mode: Map rotates to face forward (more tilted to see further ahead)
-            ui.mapEl.style.transform = `scale(2.0) rotateX(70deg) rotateZ(${-state.heading}deg)`;
+            ui.mapEl.style.transform = `scale(2.2) rotateX(75deg) rotateZ(${-state.heading}deg)`;
             // Arrow points UP on the screen (which matches where you are looking)
             // Because map is rotated -heading, arrow must rotate +heading to stay upright
             if (state.arrowEl) state.arrowEl.style.transform = `rotate(${state.heading}deg)`;
