@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Bora</title>
-    
+
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#0f172a">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -14,25 +16,28 @@
     <link rel="icon" type="image/png" href="icon-512.png">
     <link rel="apple-touch-icon" href="icon-512.png">
     <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=25">
+    <link rel="stylesheet" href="style.css?v=26">
 </head>
+
 <body style="background-color: #000000;">
     <div id="notification-container"></div>
 
     <div class="app-wrapper">
-        
+
         <!-- Full Screen Map Container -->
         <div id="map-3d-wrapper">
             <div id="map"></div>
         </div>
-        
+
         <!-- Floating Header -->
         <div class="floating-header">
             <h1>Bora</h1>
             <div style="display:flex; gap: 10px; align-items:center;">
-                <div id="compass-icon" style="font-size: 1.8rem; transition: transform 0.1s linear; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5));">🧭</div>
+                <div id="compass-icon"
+                    style="font-size: 1.8rem; transition: transform 0.1s linear; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5));">
+                    🧭</div>
                 <button id="settings-btn" class="glass-btn icon-only">
                     ⚙️
                 </button>
@@ -51,7 +56,7 @@
                     <span id="dist-text" class="stat-value">--</span>
                 </div>
             </div>
-            
+
             <button id="find-btn" class="glass-btn primary giant-btn full-width">
                 <span style="font-size: 1.5rem">🚴</span> BORA
             </button>
@@ -79,6 +84,7 @@
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <script src="app.js?v=25"></script>
+    <script src="app.js?v=26"></script>
 </body>
+
 </html>

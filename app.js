@@ -360,21 +360,20 @@ function drawDestination(dest, routeGeometry, walkTime, distMeters) {
     if (state.destMarker) state.map.removeLayer(state.destMarker);
     if (state.routingLine) state.map.removeLayer(state.routingLine);
     
-    // Create custom marker with e-bike count
+    // Create custom marker with e-bike count (Giant balloon)
     const destIcon = L.divIcon({
         html: `
-            <div style="background:#32CD32;color:white;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;border:3px solid white;box-shadow:0 0 15px rgba(50,205,50,0.6);">
+            <div style="background:#32CD32;color:white;width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:32px;border:4px solid white;box-shadow:0 0 20px rgba(50,205,50,0.8);">
                 ${eBikes}
             </div>
-            <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:10px solid #32CD32;margin:-2px auto 0;"></div>
+            <div style="width:0;height:0;border-left:12px solid transparent;border-right:12px solid transparent;border-top:14px solid #32CD32;margin:-2px auto 0;"></div>
         `,
         className: '',
-        iconSize: [36, 46],
-        iconAnchor: [18, 46]
+        iconSize: [60, 72],
+        iconAnchor: [30, 72]
     });
     
     state.destMarker = L.marker(state.destPos, { icon: destIcon }).addTo(state.map);
-    state.destMarker.bindPopup(`<b>${s.name || 'Bicing Station'}</b><br>${eBikes} E-Bikes available`, { autoPan: false }).openPopup();
     
     // Draw real street routing geometry (GeoJSON)
     const coords = routeGeometry.coordinates.map(c => [c[1], c[0]]); // GeoJSON is [lon, lat], Leaflet is [lat, lon]
